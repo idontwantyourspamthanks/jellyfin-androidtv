@@ -19,6 +19,12 @@ interface SearchRepository {
 		itemTypes: Collection<BaseItemKind>,
 		parentId: UUID? = null,
 	): Result<List<BaseItemDto>>
+
+	/**
+	 * All episodes of a show. Used for searches that also match overview text, which the server's
+	 * [search] term does not cover.
+	 */
+	suspend fun getEpisodes(seriesId: UUID): Result<List<BaseItemDto>>
 }
 
 class SearchRepositoryImpl(
@@ -60,6 +66,25 @@ class SearchRepositoryImpl(
 		Result.success(result.items)
 	} catch (e: ApiClientException) {
 		Timber.e(e, "Failed to search for items")
+		Result.failure(e)
+	}
+
+	override suspend fun getEpisodes(seriesId: UUID): Result<List<BaseItemDto>> = try {
+		val request = GetItemsRequest(
+			parentId = seriesId,
+			includeItemTypes = setOf(BaseItemKind.EPISODE),
+			recursive = true,
+			fields = ItemRepository.itemFields,
+			enableTotalRecordCount = false,
+		)
+
+		val result = withContext(Dispatchers.IO) {
+			apiClient.itemsApi.getItems(request).content
+		}
+
+		Result.success(result.items)
+	} catch (e: ApiClientException) {
+		Timber.e(e, "Failed to load episodes for $seriesId")
 		Result.failure(e)
 	}
 }

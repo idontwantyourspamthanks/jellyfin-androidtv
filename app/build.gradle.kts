@@ -6,7 +6,10 @@ plugins {
 }
 
 android {
+	// Code package stays org.jellyfin.androidtv; the install identity is KoalaPaw so it can run
+	// alongside the official Jellyfin app on the same device.
 	namespace = "org.jellyfin.androidtv"
+	val baseApplicationId = "paw.koala.androidtv"
 	compileSdk = libs.versions.android.compileSdk.get().toInt()
 
 	defaultConfig {
@@ -14,7 +17,7 @@ android {
 		targetSdk = libs.versions.android.targetSdk.get().toInt()
 
 		// Release version
-		applicationId = namespace
+		applicationId = baseApplicationId
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
 	}
@@ -58,9 +61,9 @@ android {
 			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 
 			// Set package names used in various XML files
-			resValue("string", "app_id", namespace!!)
-			resValue("string", "app_search_suggest_authority", "${namespace}.content")
-			resValue("string", "app_search_suggest_intent_data", "content://${namespace}.content/intent")
+			resValue("string", "app_id", baseApplicationId)
+			resValue("string", "app_search_suggest_authority", "${baseApplicationId}.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${baseApplicationId}.content/intent")
 
 			// Set flavored application name
 			resValue("string", "app_name", "@string/app_name_release")
@@ -75,9 +78,9 @@ android {
 			applicationIdSuffix = ".debug"
 
 			// Set package names used in various XML files
-			resValue("string", "app_id", namespace + applicationIdSuffix)
-			resValue("string", "app_search_suggest_authority", "${namespace + applicationIdSuffix}.content")
-			resValue("string", "app_search_suggest_intent_data", "content://${namespace + applicationIdSuffix}.content/intent")
+			resValue("string", "app_id", "${baseApplicationId}.debug")
+			resValue("string", "app_search_suggest_authority", "${baseApplicationId}.debug.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${baseApplicationId}.debug.content/intent")
 
 			// Set flavored application name
 			resValue("string", "app_name", "@string/app_name_debug")

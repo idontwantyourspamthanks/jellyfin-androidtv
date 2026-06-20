@@ -93,7 +93,9 @@ object BrowsingUtils {
 	@JvmStatic
 	fun createSeasonsRequest(seriesId: UUID) = GetSeasonsRequest(
 		seriesId = seriesId,
-		fields = ItemRepository.itemFields,
+		// Season cards only need name/image, so use the light field set - the heavy itemFields
+		// (media sources/streams, chapters, trickplay) made this noticeably slow to load.
+		fields = ItemRepository.browseFields,
 	)
 
 	@JvmStatic

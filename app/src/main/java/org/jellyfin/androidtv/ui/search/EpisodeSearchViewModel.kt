@@ -27,12 +27,22 @@ class EpisodeSearchViewModel(
 	private var searchJob: Job? = null
 	private var previousQuery: String? = null
 	private var seriesId: UUID? = null
+	private var includeDescriptions = false
+
+	// Cache of all episodes, loaded lazily the first time a description search runs.
+	private var allEpisodes: List<BaseItemDto>? = null
 
 	private val _searchResultsFlow = MutableStateFlow<List<BaseItemDto>>(emptyList())
 	val searchResultsFlow = _searchResultsFlow.asStateFlow()
 
 	fun setSeries(seriesId: UUID) {
 		this.seriesId = seriesId
+	}
+
+	fun setIncludeDescriptions(value: Boolean) {
+		includeDescriptions = value
+		// Force the next search to run even if the query text is unchanged
+		previousQuery = null
 	}
 
 	fun searchImmediately(query: String) = searchDebounced(query, 0.milliseconds)
@@ -52,8 +62,21 @@ class EpisodeSearchViewModel(
 		searchJob = viewModelScope.launch {
 			delay(debounce)
 
-			val result = searchRepository.search(trimmed, setOf(BaseItemKind.EPISODE), seriesId)
-			_searchResultsFlow.value = result.getOrNull().orEmpty()
+			_searchResultsFlow.value = if (includeDescriptions) {
+				// searchTerm doesn't match overviews, so filter the show's episodes locally
+				cachedEpisodes().filter { episode ->
+					episode.name?.contains(trimmed, ignoreCase = true) == true ||
+						episode.overview?.contains(trimmed, ignoreCase = true) == true
+				}
+			} else {
+				searchRepository.search(trimmed, setOf(BaseItemKind.EPISODE), seriesId).getOrNull().orEmpty()
+			}
 		}
+	}
+
+	private suspend fun cachedEpisodes(): List<BaseItemDto> {
+		allEpisodes?.let { return it }
+		val seriesId = seriesId ?: return emptyList()
+		return searchRepository.getEpisodes(seriesId).getOrNull().orEmpty().also { allEpisodes = it }
 	}
 }
