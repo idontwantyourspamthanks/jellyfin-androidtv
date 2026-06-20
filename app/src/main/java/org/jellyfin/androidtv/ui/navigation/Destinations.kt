@@ -22,6 +22,7 @@ import org.jellyfin.androidtv.ui.playback.nextup.NextUpFragment
 import org.jellyfin.androidtv.ui.playback.stillwatching.StillWatchingFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
+import org.jellyfin.androidtv.ui.search.EpisodeSearchFragment
 import org.jellyfin.androidtv.ui.search.SearchFragment
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
@@ -35,6 +36,9 @@ object Destinations {
 	val home = fragmentDestination<HomeFragment>()
 	fun search(query: String? = null) = fragmentDestination<SearchFragment> {
 		putString(SearchFragment.EXTRA_QUERY, query)
+	}
+	fun episodeSearch(seriesId: UUID) = fragmentDestination<EpisodeSearchFragment> {
+		putString(EpisodeSearchFragment.EXTRA_SERIES_ID, seriesId.toString())
 	}
 
 	// Browsing

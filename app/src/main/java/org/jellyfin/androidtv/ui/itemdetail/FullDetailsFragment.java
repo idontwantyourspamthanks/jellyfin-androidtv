@@ -837,6 +837,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     TextUnderButton shuffleButton = null;
     TextUnderButton goToSeriesButton = null;
     TextUnderButton seasonsButton = null;
+    TextUnderButton searchEpisodesButton = null;
     TextUnderButton queueButton = null;
     TextUnderButton deleteButton = null;
     TextUnderButton moreButton;
@@ -1090,6 +1091,18 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
             });
             mDetailsOverviewRow.addAction(seasonsButton);
+        }
+
+        // Search this show's episodes - available at every level of the show hierarchy
+        UUID showId = mBaseItem.getType() == BaseItemKind.SERIES ? mBaseItem.getId() : mBaseItem.getSeriesId();
+        if (showId != null && (mBaseItem.getType() == BaseItemKind.SERIES || mBaseItem.getType() == BaseItemKind.SEASON || mBaseItem.getType() == BaseItemKind.EPISODE)) {
+            searchEpisodesButton = TextUnderButton.create(requireContext(), R.drawable.ic_search, buttonSize, 0, getString(R.string.lbl_search), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    navigationRepository.getValue().navigate(Destinations.INSTANCE.episodeSearch(showId));
+                }
+            });
+            mDetailsOverviewRow.addAction(searchEpisodesButton);
         }
 
         boolean deletableItem = false;

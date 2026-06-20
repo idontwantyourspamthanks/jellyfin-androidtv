@@ -11,11 +11,13 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import timber.log.Timber
+import java.util.UUID
 
 interface SearchRepository {
 	suspend fun search(
 		searchTerm: String,
 		itemTypes: Collection<BaseItemKind>,
+		parentId: UUID? = null,
 	): Result<List<BaseItemDto>>
 }
 
@@ -29,6 +31,7 @@ class SearchRepositoryImpl(
 	override suspend fun search(
 		searchTerm: String,
 		itemTypes: Collection<BaseItemKind>,
+		parentId: UUID?,
 	): Result<List<BaseItemDto>> = try {
 		var request = GetItemsRequest(
 			searchTerm = searchTerm,
@@ -38,6 +41,7 @@ class SearchRepositoryImpl(
 			fields = ItemRepository.itemFields,
 			recursive = true,
 			enableTotalRecordCount = false,
+			parentId = parentId,
 		)
 
 		// Special case for video row
