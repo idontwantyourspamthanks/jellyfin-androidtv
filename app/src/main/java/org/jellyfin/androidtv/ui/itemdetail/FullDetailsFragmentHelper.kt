@@ -11,7 +11,13 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
+import kotlinx.serialization.json.Json
+import org.jellyfin.androidtv.constant.Extras
 import org.jellyfin.androidtv.data.repository.ItemRepository
+import org.jellyfin.androidtv.ui.SeasonSelectionPopup
+import org.jellyfin.androidtv.ui.browsing.BrowsingUtils
+import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
+import org.jellyfin.androidtv.ui.navigation.Destination
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.util.TimeUtils
@@ -100,6 +106,99 @@ fun FullDetailsFragment.showDetailsMenu(
 		item(getString(R.string.lbl_goto_series)) { gotoSeries() }
 	}
 }.showIfNotEmpty()
+
+/**
+ * Navigate up the content hierarchy: episode -> season -> show -> library. Other detail items go
+ * up to their container (usually the library). Reached via the Back button.
+ */
+fun FullDetailsFragment.navigateUp() {
+	val item = mBaseItem
+	val navigationRepository by inject<NavigationRepository>()
+
+	// Episodes and seasons have explicit content parents we can resolve without a round-trip.
+	val directParentId = when (item.type) {
+		BaseItemKind.EPISODE -> item.seasonId ?: item.seriesId
+		BaseItemKind.SEASON -> item.seriesId
+		else -> null
+	}
+	if (directParentId != null) {
+		navigationRepository.goUpTo(Destinations.itemDetails(directParentId), directParentId)
+		return
+	}
+
+	// Everything else goes up to its container, which we fetch so we can route to it correctly.
+	val parentId = item.parentId
+	if (parentId == null) {
+		navigationRepository.goBack()
+		return
+	}
+
+	val api by inject<ApiClient>()
+	val itemLauncher by inject<ItemLauncher>()
+	lifecycleScope.launch {
+		val parent = try {
+			withContext(Dispatchers.IO) { api.userLibraryApi.getItem(parentId).content }
+		} catch (error: ApiClientException) {
+			Timber.w(error, "Failed to load parent $parentId for up-navigation")
+			null
+		}
+		if (parent == null) {
+			navigationRepository.goBack()
+			return@launch
+		}
+
+		val destination = if (parent.isFolderLike) itemLauncher.getUserViewDestination(parent)
+		else Destinations.itemDetails(parent.id)
+		navigationRepository.goUpTo(destination, parent.id)
+	}
+}
+
+private val BaseItemDto.isFolderLike
+	get() = type == BaseItemKind.USER_VIEW || type == BaseItemKind.COLLECTION_FOLDER || isFolder == true
+
+/**
+ * If Back already returns to [targetId] (a normal drill-down), just go back. Otherwise replace the
+ * current page with [destination] so the current item isn't stranded on the stack (which would
+ * create an up/down loop).
+ */
+private fun NavigationRepository.goUpTo(destination: Destination.Fragment, targetId: UUID) {
+	if (previousDestination?.representedItemId() == targetId) goBack()
+	else navigate(destination, replace = true)
+}
+
+/** The id of the item a destination represents, for item-detail and folder/library destinations. */
+private fun Destination.Fragment.representedItemId(): UUID? {
+	arguments.getString("ItemId")?.let { return runCatching { UUID.fromString(it) }.getOrNull() }
+	arguments.getString(Extras.Folder)?.let { json ->
+		return runCatching { Json.decodeFromString(BaseItemDto.serializer(), json).id }.getOrNull()
+	}
+	return null
+}
+
+fun FullDetailsFragment.showSeasonSelection(view: View) {
+	val seriesId = mBaseItem.seriesId ?: return
+	val api by inject<ApiClient>()
+	val navigationRepository by inject<NavigationRepository>()
+
+	lifecycleScope.launch {
+		val seasons = try {
+			withContext(Dispatchers.IO) {
+				api.tvShowsApi.getSeasons(BrowsingUtils.createSeasonsRequest(seriesId)).content
+			}.items
+		} catch (error: ApiClientException) {
+			Timber.w(error, "Failed to load seasons for series $seriesId")
+			return@launch
+		}
+
+		if (seasons.isEmpty()) return@launch
+
+		val currentSeasonId = if (mBaseItem.type == BaseItemKind.SEASON) mBaseItem.id else mBaseItem.seasonId
+
+		SeasonSelectionPopup(requireContext(), view) { season ->
+			navigationRepository.navigate(Destinations.itemDetails(season.id))
+		}.show(seasons, currentSeasonId)
+	}
+}
 
 fun FullDetailsFragment.createFakeSeriesTimerBaseItemDto(timer: SeriesTimerInfoDto) = BaseItemDto(
 	id = requireNotNull(timer.id).toUUID(),

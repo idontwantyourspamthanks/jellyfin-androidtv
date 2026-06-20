@@ -60,6 +60,7 @@
     <string name="lbl_item">Item</string>
     <string name="lbl_series">Series</string>
     <string name="lbl_seasons">Seasons</string>
+    <string name="lbl_jump_to_season">Jump to season</string>
     <string name="lbl_upcoming">Upcoming</string>
     <string name="lbl_favorite">Favorite</string>
     <string name="lbl_watched">Watched</string>

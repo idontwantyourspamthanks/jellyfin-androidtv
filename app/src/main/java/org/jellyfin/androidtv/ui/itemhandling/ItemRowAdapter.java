@@ -133,6 +133,31 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         mRow = row;
     }
 
+    public ListRow getRow() {
+        return mRow;
+    }
+
+    // When set, the row's horizontal list is scrolled to this position once its items load
+    // (e.g. an episode's row of the whole season, focused on the next episode). Applied once.
+    private Integer preferredScrollPosition;
+    private boolean preferredScrollApplied;
+
+    public void setPreferredScrollPosition(int position) {
+        preferredScrollPosition = position;
+    }
+
+    public Integer getPreferredScrollPosition() {
+        return preferredScrollPosition;
+    }
+
+    public boolean isPreferredScrollApplied() {
+        return preferredScrollApplied;
+    }
+
+    public void setPreferredScrollApplied(boolean applied) {
+        preferredScrollApplied = applied;
+    }
+
     public void setSiblingRow(Row row) {
         siblingRow = row;
     }

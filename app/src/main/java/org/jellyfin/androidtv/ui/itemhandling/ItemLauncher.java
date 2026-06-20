@@ -118,7 +118,7 @@ public class ItemLauncher {
 
                         return;
                     case SEASON:
-                        navigationRepository.getValue().navigate(Destinations.INSTANCE.folderBrowser(baseItem));
+                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(baseItem.getId()));
                         return;
 
                     case BOX_SET:

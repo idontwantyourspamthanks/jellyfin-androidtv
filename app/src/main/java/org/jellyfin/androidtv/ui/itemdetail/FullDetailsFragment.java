@@ -18,6 +18,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.PopupMenu;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewKt;
@@ -26,7 +27,9 @@ import androidx.leanback.app.RowsSupportFragment;
 import androidx.leanback.widget.ArrayObjectAdapter;
 import androidx.leanback.widget.ClassPresenterSelector;
 import androidx.leanback.widget.HeaderItem;
+import androidx.leanback.widget.HorizontalGridView;
 import androidx.leanback.widget.ListRow;
+import androidx.leanback.widget.ListRowPresenter;
 import androidx.leanback.widget.OnItemViewClickedListener;
 import androidx.leanback.widget.OnItemViewSelectedListener;
 import androidx.leanback.widget.Presenter;
@@ -69,6 +72,7 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter;
 import org.jellyfin.androidtv.ui.presentation.MyDetailsOverviewRowPresenter;
 import org.jellyfin.androidtv.util.CoroutineUtils;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
+import org.jellyfin.androidtv.util.apiclient.EmptyResponse;
 import org.jellyfin.androidtv.util.ImageHelper;
 import org.jellyfin.androidtv.util.KeyProcessor;
 import org.jellyfin.androidtv.util.MarkdownRenderer;
@@ -153,6 +157,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     private final Lazy<ImageHelper> imageHelper = inject(ImageHelper.class);
     private final Lazy<InteractionTrackerViewModel> interactionTracker = inject(InteractionTrackerViewModel.class);
 
+    // Back navigates up the content hierarchy (episode -> season -> show -> library) instead of
+    // popping to wherever the item was opened from.
+    private OnBackPressedCallback upNavigationCallback;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -209,9 +217,27 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             return null;
         });
 
+        upNavigationCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                FullDetailsFragmentHelperKt.navigateUp(FullDetailsFragment.this);
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(this, upNavigationCallback);
+
         loadItem(mItemId);
 
         return binding.getRoot();
+    }
+
+    // Live TV, recordings-in-progress and series timer detail pages keep normal back behaviour;
+    // everything else navigates up its content hierarchy.
+    private boolean isUpNavigable() {
+        return mBaseItem != null && mProgramInfo == null && mSeriesTimerInfo == null && mChannelId == null;
+    }
+
+    private void updateUpNavigationCallback() {
+        if (upNavigationCallback != null) upNavigationCallback.setEnabled(isUpNavigable());
     }
 
     int getResumePreroll() {
@@ -226,6 +252,9 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     @Override
     public void onResume() {
         super.onResume();
+
+        // Only the visible page should intercept Back
+        updateUpNavigationCallback();
 
         ClockBehavior clockBehavior = userPreferences.getValue().get(UserPreferences.Companion.getClockBehavior());
         if (clockBehavior == ClockBehavior.ALWAYS || clockBehavior == ClockBehavior.IN_MENUS) {
@@ -282,6 +311,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     public void onPause() {
         super.onPause();
         stopClock();
+        // Don't intercept Back while this page isn't the visible one
+        if (upNavigationCallback != null) upNavigationCallback.setEnabled(false);
     }
 
     @Override
@@ -437,6 +468,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                         firstRow = new InfoItem(
                                 getString(R.string.lbl_seasons),
                                 String.format("%d", Utils.getSafeValue(item.getChildCount(), 0)));
+                    } else if (item.getType() == BaseItemKind.SEASON) {
+                        firstRow = new InfoItem(
+                                getString(R.string.lbl_episodes),
+                                String.format("%d", Utils.getSafeValue(item.getChildCount(), 0)));
                     } else {
                         firstRow = new InfoItem(
                                 getString(R.string.lbl_directed_by),
@@ -502,6 +537,30 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             }
             new BuildDorTask().execute(item);
         }
+
+        // The item type is now known - decide whether Back should navigate up the hierarchy
+        updateUpNavigationCallback();
+    }
+
+    // Scroll a row to its preferred position once data has loaded, for rows already bound on screen.
+    // Off-screen rows are handled by CustomListRowPresenter when they're scrolled into view.
+    private void scrollRowToPreferredPosition(ItemRowAdapter rowAdapter) {
+        if (rowAdapter.isPreferredScrollApplied() || rowAdapter.getPreferredScrollPosition() == null) return;
+        if (mRowsFragment == null || mRowsAdapter == null) return;
+
+        ListRow row = rowAdapter.getRow();
+        if (row == null) return;
+        int rowIndex = mRowsAdapter.indexOf(row);
+        if (rowIndex < 0) return;
+
+        RowPresenter.ViewHolder rowViewHolder = mRowsFragment.getRowViewHolder(rowIndex);
+        if (!(rowViewHolder instanceof ListRowPresenter.ViewHolder)) return; // not bound yet
+        if (rowAdapter.size() == 0) return;
+
+        HorizontalGridView gridView = ((ListRowPresenter.ViewHolder) rowViewHolder).getGridView();
+        int clamped = Math.max(0, Math.min(rowAdapter.getPreferredScrollPosition(), rowAdapter.size() - 1));
+        gridView.post(() -> gridView.setSelectedPosition(clamped));
+        rowAdapter.setPreferredScrollApplied(true);
     }
 
     protected void addItemRow(MutableObjectAdapter<Row> parent, ItemRowAdapter row, int index, String headerText) {
@@ -588,11 +647,11 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 break;
             case SERIES:
-                ItemRowAdapter nextUpAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeriesGetNextUpRequest(mBaseItem.getId()), false, new CardPresenter(true, 130), adapter);
-                addItemRow(adapter, nextUpAdapter, 0, getString(R.string.lbl_next_up));
-
                 ItemRowAdapter seasonsAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeasonsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
-                addItemRow(adapter, seasonsAdapter, 1, getString(R.string.lbl_seasons));
+                addItemRow(adapter, seasonsAdapter, 0, getString(R.string.lbl_seasons));
+
+                ItemRowAdapter nextUpAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeriesGetNextUpRequest(mBaseItem.getId()), false, new CardPresenter(true, 130), adapter);
+                addItemRow(adapter, nextUpAdapter, 1, getString(R.string.lbl_next_up));
 
                 //Specials
                 if (mBaseItem.getSpecialFeatureCount() != null && mBaseItem.getSpecialFeatureCount() > 0) {
@@ -611,6 +670,17 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 addItemRow(adapter, similarAdapter, 4, getString(R.string.lbl_more_like_this));
                 break;
 
+            case SEASON:
+                ItemRowAdapter seasonEpisodesAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeasonEpisodesRequest(mBaseItem.getId()), 100, false, new CardPresenter(true, 120), adapter);
+                addItemRow(adapter, seasonEpisodesAdapter, 0, getString(R.string.lbl_episodes));
+
+                //Specials
+                ItemRowAdapter seasonSpecialsAdapter = new ItemRowAdapter(requireContext(), new GetSpecialsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                addItemRow(adapter, seasonSpecialsAdapter, 1, getString(R.string.lbl_specials));
+
+                addInfoRows(adapter);
+                break;
+
             case EPISODE:
                 //Additional Parts
                 if (mBaseItem.getPartCount() != null && mBaseItem.getPartCount() > 0) {
@@ -619,8 +689,17 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
 
                 if (mBaseItem.getSeasonId() != null && mBaseItem.getIndexNumber() != null) {
-                    // query index is zero-based but episode no is not
-                    ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createNextEpisodesRequest(mBaseItem.getSeasonId(), mBaseItem.getIndexNumber()), 0, false, true, new CardPresenter(true, 120), adapter);
+                    // Show the whole season so you can scroll back to earlier episodes, but open
+                    // focused on the next one. The next episode's 0-based position equals this
+                    // episode's 1-based number.
+                    ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeasonEpisodesRequest(mBaseItem.getSeasonId()), 100, false, true, new CardPresenter(true, 120), adapter);
+                    nextAdapter.setPreferredScrollPosition(mBaseItem.getIndexNumber());
+                    nextAdapter.setRetrieveFinishedListener(new EmptyResponse(getLifecycle()) {
+                        @Override
+                        public void onResponse() {
+                            scrollRowToPreferredPosition(nextAdapter);
+                        }
+                    });
                     addItemRow(adapter, nextAdapter, 5, getString(R.string.lbl_next_episode));
                 }
 
@@ -757,6 +836,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     TextUnderButton favButton = null;
     TextUnderButton shuffleButton = null;
     TextUnderButton goToSeriesButton = null;
+    TextUnderButton seasonsButton = null;
     TextUnderButton queueButton = null;
     TextUnderButton deleteButton = null;
     TextUnderButton moreButton;
@@ -1000,6 +1080,16 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
             });
             mDetailsOverviewRow.addAction(goToSeriesButton);
+        }
+
+        if (mBaseItem.getType() == BaseItemKind.EPISODE || mBaseItem.getType() == BaseItemKind.SEASON) {
+            seasonsButton = TextUnderButton.create(requireContext(), R.drawable.ic_grid, buttonSize, 0, getString(R.string.lbl_seasons), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    FullDetailsFragmentHelperKt.showSeasonSelection(FullDetailsFragment.this, v);
+                }
+            });
+            mDetailsOverviewRow.addAction(seasonsButton);
         }
 
         boolean deletableItem = false;

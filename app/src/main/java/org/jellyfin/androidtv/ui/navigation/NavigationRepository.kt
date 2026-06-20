@@ -40,6 +40,12 @@ interface NavigationRepository {
 	val canGoBack: Boolean
 
 	/**
+	 * The fragment destination that [goBack] would return to, or null when the back stack has no
+	 * previous entry.
+	 */
+	val previousDestination: Destination.Fragment?
+
+	/**
 	 * Go back to the previous fragment. The back stack does not consider other destination types.
 	 *
 	 * @see [canGoBack]
@@ -80,6 +86,9 @@ class NavigationRepositoryImpl(
 	}
 
 	override val canGoBack: Boolean get() = fragmentHistory.isNotEmpty()
+
+	override val previousDestination: Destination.Fragment?
+		get() = if (fragmentHistory.size >= 2) fragmentHistory[fragmentHistory.size - 2] else null
 
 	override fun goBack(): Boolean {
 		if (fragmentHistory.empty()) return false
