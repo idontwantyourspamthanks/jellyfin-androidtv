@@ -4,6 +4,7 @@ import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.preference.store.DisplayPreferencesStore
 import org.jellyfin.preference.enumPreference
 import org.jellyfin.preference.intPreference
+import org.jellyfin.preference.stringPreference
 import org.jellyfin.sdk.api.client.ApiClient
 
 class UserSettingPreferences(
@@ -27,6 +28,9 @@ class UserSettingPreferences(
 		val homesection7 = enumPreference("homesection7", HomeSectionType.NONE)
 		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
 		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
+
+		/** JSON-encoded [org.jellyfin.androidtv.data.repository.LibraryDisplayState]. */
+		val libraryDisplay = stringPreference("library_display", "")
 	}
 
 	val homesections = listOf(

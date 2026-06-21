@@ -2,8 +2,10 @@ package org.jellyfin.androidtv.ui.browsing
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.FocusFinder
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.fragment.app.Fragment
@@ -26,6 +28,8 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProvideLocalInteractionTracker
 import org.jellyfin.androidtv.ui.composable.compat.AppNavigationHost
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.navigation.drawer.MainActivityNavigationDrawer
+import org.jellyfin.androidtv.ui.navigation.drawer.NavigationDrawerViewModel
 import org.jellyfin.androidtv.ui.screensaver.InAppScreensaver
 import org.jellyfin.androidtv.ui.settings.compat.MainActivitySettings
 import org.jellyfin.androidtv.ui.startup.StartupActivity
@@ -39,6 +43,7 @@ class MainActivity : FragmentActivity() {
 	private val sessionRepository by inject<SessionRepository>()
 	private val userRepository by inject<UserRepository>()
 	private val interactionTrackerViewModel by viewModel<InteractionTrackerViewModel>()
+	private val navigationDrawerViewModel by viewModel<NavigationDrawerViewModel>()
 	private val workManager by inject<WorkManager>()
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,6 +60,9 @@ class MainActivity : FragmentActivity() {
 			}.launchIn(lifecycleScope)
 
 		if (savedInstanceState == null && navigationRepository.canGoBack) navigationRepository.reset(clearHistory = true)
+
+		// Greet the user with the navigation drawer open on a fresh launch.
+		if (savedInstanceState == null) navigationDrawerViewModel.open()
 
 		navigationRepository.currentAction
 			.flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
@@ -73,6 +81,7 @@ class MainActivity : FragmentActivity() {
 					)
 					InAppScreensaver()
 					MainActivitySettings()
+					MainActivityNavigationDrawer()
 				}
 			}
 		}
@@ -127,12 +136,35 @@ class MainActivity : FragmentActivity() {
 	private fun onKeyEvent(keyCode: Int, event: KeyEvent?): Boolean = supportFragmentManager.fragments
 		.any { it.onKeyEvent(keyCode, event) }
 
-	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)
+	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+		// The menu key toggles the navigation drawer app-wide, before fragments see it.
+		if (keyCode == KeyEvent.KEYCODE_MENU) {
+			navigationDrawerViewModel.toggle()
+			return true
+		}
+		// Pressing left at the screen's left edge opens the drawer - works on any remote.
+		if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event?.repeatCount == 0 && shouldOpenDrawerOnLeft()) {
+			navigationDrawerViewModel.open()
+			return true
+		}
+		return onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)
+	}
 
-	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	/** True when focus is at the far left (nothing focusable further left), so left should reveal the drawer. */
+	private fun shouldOpenDrawerOnLeft(): Boolean {
+		if (navigationDrawerViewModel.open.value || navigationDrawerViewModel.suppressed.value) return false
+		val focused = currentFocus ?: return false
+		val root = window.decorView as? ViewGroup ?: return false
+		return FocusFinder.getInstance().findNextFocus(root, focused, View.FOCUS_LEFT) == null
+	}
 
-	override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+		if (keyCode == KeyEvent.KEYCODE_MENU) return true
+		return onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	}
+
+	override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+		if (keyCode == KeyEvent.KEYCODE_MENU) return true
+		return onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	}
 }

@@ -12,7 +12,9 @@ import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest
+import org.jellyfin.androidtv.data.repository.LibraryDisplayPreferences
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
+import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
 import org.jellyfin.sdk.api.client.ApiClient
@@ -226,7 +228,11 @@ fun ItemRowAdapter.retrieveAdditionalParts(api: ApiClient, query: GetAdditionalP
 	}
 }
 
-fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserViewsRepository) {
+fun ItemRowAdapter.retrieveUserViews(
+	api: ApiClient,
+	userViewsRepository: UserViewsRepository,
+	userSettingPreferences: UserSettingPreferences,
+) {
 	ProcessLifecycleOwner.get().lifecycleScope.launch {
 		runCatching {
 			val response = withContext(Dispatchers.IO) {
@@ -236,12 +242,18 @@ fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserVi
 			val filteredItems = response.items
 				.filter { userViewsRepository.isSupported(it.collectionType) }
 
+			// Apply the user's chosen order and hidden set, shared with the navigation drawer.
+			val orderedItems = LibraryDisplayPreferences.applyVisible(
+				filteredItems,
+				LibraryDisplayPreferences.parse(userSettingPreferences[UserSettingPreferences.libraryDisplay]),
+			)
+
 			setItems(
-				items = filteredItems,
+				items = orderedItems,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item, staticHeight = true) }
 			)
 
-			if (filteredItems.isEmpty()) removeRow()
+			if (orderedItems.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

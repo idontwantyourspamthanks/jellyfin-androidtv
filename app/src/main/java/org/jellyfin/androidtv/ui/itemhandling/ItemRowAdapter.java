@@ -103,6 +103,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
     private final Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
+    private final Lazy<org.jellyfin.androidtv.preference.UserSettingPreferences> userSettingPreferences = inject(org.jellyfin.androidtv.preference.UserSettingPreferences.class);
     private Context context;
 
     private boolean isCurrentlyRetrieving() {
@@ -619,7 +620,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 ItemRowAdapterHelperKt.retrieveSeasons(this, api.getValue(), mSeasonQuery);
                 break;
             case Views:
-                ItemRowAdapterHelperKt.retrieveUserViews(this, api.getValue(), userViewsRepository.getValue());
+                ItemRowAdapterHelperKt.retrieveUserViews(this, api.getValue(), userViewsRepository.getValue(), userSettingPreferences.getValue());
                 break;
             case SimilarSeries:
             case SimilarMovies:

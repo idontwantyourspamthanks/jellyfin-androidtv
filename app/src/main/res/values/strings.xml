@@ -24,6 +24,12 @@
     <string name="lbl_status">%1$s / %2$s</string>
     <string name="lbl_genres">Genres</string>
     <string name="lbl_search">Search</string>
+    <string name="lbl_edit_libraries">Edit libraries</string>
+    <string name="lbl_edit_libraries_caption">Reorder your libraries and choose which ones appear on the home screen and in the menu.</string>
+    <string name="lbl_move_up">Move up</string>
+    <string name="lbl_move_down">Move down</string>
+    <string name="lbl_show">Show</string>
+    <string name="lbl_hide">Hide</string>
     <string name="msg_not_implemented">" not implemented"</string>
     <string name="lbl_latest">Recently added</string>
     <string name="lbl_latest_in">Recently added in %1$s</string>

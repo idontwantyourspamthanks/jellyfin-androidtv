@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,8 +28,6 @@ import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
-import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
-import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
 
 class HomeFragment : Fragment() {
@@ -46,34 +43,30 @@ class HomeFragment : Fragment() {
 		val rowsFocusRequester = remember { FocusRequester() }
 		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
 
-		Column {
-			MainToolbar(MainToolbarActiveButton.Home)
-
-			// The leanback code has its own awful focus handling that doesn't work properly with Compose view inteop to workaround this
-			// issue we add custom behavior that only allows focus exit when the current selected row is the first one. Additionally when
-			// we do switch the focus, we reset the leanback state so it won't cause weird behavior when focus is regained
-			var rowsSupportFragment by remember { mutableStateOf<HomeRowsFragment?>(null) }
-			AndroidFragment<HomeRowsFragment>(
-				modifier = Modifier
-					.focusGroup()
-					.focusRequester(rowsFocusRequester)
-					.focusProperties {
-						onExit = {
-							val isFirstRowSelected = rowsSupportFragment?.selectedPosition?.let { it <= 0 } ?: false
-							if (requestedFocusDirection != FocusDirection.Up || !isFirstRowSelected) {
-								cancelFocusChange()
-							} else {
-								rowsSupportFragment?.selectedPosition = 0
-								rowsSupportFragment?.verticalGridView?.clearFocus()
-							}
+		// The leanback code has its own awful focus handling that doesn't work properly with Compose view inteop to workaround this
+		// issue we add custom behavior that only allows focus exit when the current selected row is the first one. Additionally when
+		// we do switch the focus, we reset the leanback state so it won't cause weird behavior when focus is regained
+		var rowsSupportFragment by remember { mutableStateOf<HomeRowsFragment?>(null) }
+		AndroidFragment<HomeRowsFragment>(
+			modifier = Modifier
+				.focusGroup()
+				.focusRequester(rowsFocusRequester)
+				.focusProperties {
+					onExit = {
+						val isFirstRowSelected = rowsSupportFragment?.selectedPosition?.let { it <= 0 } ?: false
+						if (requestedFocusDirection != FocusDirection.Up || !isFirstRowSelected) {
+							cancelFocusChange()
+						} else {
+							rowsSupportFragment?.selectedPosition = 0
+							rowsSupportFragment?.verticalGridView?.clearFocus()
 						}
 					}
-					.fillMaxSize(),
-				onUpdate = { fragment ->
-					rowsSupportFragment = fragment
 				}
-			)
-		}
+				.fillMaxSize(),
+			onUpdate = { fragment ->
+				rowsSupportFragment = fragment
+			}
+		)
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
