@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemDto
-import org.jellyfin.sdk.model.api.BaseItemKind
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -27,9 +26,8 @@ class EpisodeSearchViewModel(
 	private var searchJob: Job? = null
 	private var previousQuery: String? = null
 	private var seriesId: UUID? = null
-	private var includeDescriptions = false
 
-	// Cache of all episodes, loaded lazily the first time a description search runs.
+	// Cache of all episodes, loaded lazily the first time a search runs.
 	private var allEpisodes: List<BaseItemDto>? = null
 
 	private val _searchResultsFlow = MutableStateFlow<List<BaseItemDto>>(emptyList())
@@ -37,12 +35,6 @@ class EpisodeSearchViewModel(
 
 	fun setSeries(seriesId: UUID) {
 		this.seriesId = seriesId
-	}
-
-	fun setIncludeDescriptions(value: Boolean) {
-		includeDescriptions = value
-		// Force the next search to run even if the query text is unchanged
-		previousQuery = null
 	}
 
 	fun searchImmediately(query: String) = searchDebounced(query, 0.milliseconds)
@@ -62,14 +54,11 @@ class EpisodeSearchViewModel(
 		searchJob = viewModelScope.launch {
 			delay(debounce)
 
-			_searchResultsFlow.value = if (includeDescriptions) {
-				// searchTerm doesn't match overviews, so filter the show's episodes locally
-				cachedEpisodes().filter { episode ->
-					episode.name?.contains(trimmed, ignoreCase = true) == true ||
-						episode.overview?.contains(trimmed, ignoreCase = true) == true
-				}
-			} else {
-				searchRepository.search(trimmed, setOf(BaseItemKind.EPISODE), seriesId).getOrNull().orEmpty()
+			// The server's searchTerm doesn't match overviews, so filter the show's episodes
+			// locally to search titles and descriptions together.
+			_searchResultsFlow.value = cachedEpisodes().filter { episode ->
+				episode.name?.contains(trimmed, ignoreCase = true) == true ||
+					episode.overview?.contains(trimmed, ignoreCase = true) == true
 			}
 		}
 	}
