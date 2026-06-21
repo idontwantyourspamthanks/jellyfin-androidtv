@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.home
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
@@ -24,17 +25,15 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
-import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.constant.LiveTvOption
-import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
-import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
-import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.CompositeClickedListener
 import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener
@@ -46,13 +45,21 @@ import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
+import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.util.KeyProcessor
+import org.jellyfin.androidtv.util.popupMenu
+import org.jellyfin.androidtv.util.showIfNotEmpty
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.itemsApi
+import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.sockets.subscribe
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
@@ -66,12 +73,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val mediaManager by inject<MediaManager>()
 	private val notificationsRepository by inject<NotificationsRepository>()
 	private val userRepository by inject<UserRepository>()
-	private val userSettingPreferences by inject<UserSettingPreferences>()
-	private val userViewsRepository by inject<UserViewsRepository>()
 	private val dataRefreshService by inject<DataRefreshService>()
 	private val customMessageRepository by inject<CustomMessageRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
+	private val playbackLauncher by inject<PlaybackLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 
 	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository) }
@@ -91,37 +97,19 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter())
 
 		lifecycleScope.launch(Dispatchers.IO) {
-			val currentUser = withTimeout(30.seconds) {
+			// Wait until the user session is ready before building rows.
+			withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}
-
-			// Start out with default sections
-			val homesections = userSettingPreferences.activeHomesections
-
-			// Make sure the rows are empty
-			val rows = mutableListOf<HomeFragmentRow>()
 
 			// Check for coroutine cancellation
 			if (!isActive) return@launch
 
-			// Actually add the sections
-			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
-				// The library ("My Media") rows are superseded by the navigation drawer's library list.
-				HomeSectionType.LIBRARY_TILES_SMALL -> Unit
-				HomeSectionType.LIBRARY_BUTTONS -> Unit
-				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
-				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
-				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
-				HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
-				HomeSectionType.NEXT_UP -> rows.add(helper.loadNextUp())
-				HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
-					rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
-					rows.add(helper.loadOnNow())
-				}
-
-				HomeSectionType.NONE -> Unit
-			}
+			// A deliberately lean home: what to watch right now. Libraries live in the drawer, so we
+			// skip the directory-style rows and lead with Continue Watching, then Favourites.
+			val rows = mutableListOf<HomeFragmentRow>()
+			rows.add(helper.loadResumeVideo())
+			rows.add(HomeFragmentFavoritesRow(api, lifecycleScope))
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
@@ -131,18 +119,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-
-				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
-				@Suppress("UNCHECKED_CAST")
-				val rowsAdapter = adapter as MutableObjectAdapter<Row>
-				for (i in 0 until rowsAdapter.size()) {
-					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
-					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
-					if (itemAdapter.queryType == QueryType.LiveTvProgram && i > 0) {
-						val previousRow = rowsAdapter.get(i - 1)
-						if (previousRow != null) itemAdapter.setSiblingRow(previousRow)
-					}
-				}
 			}
 		}
 
@@ -241,6 +217,61 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.removeAudioEventListener(this)
 	}
 
+	private fun showFavoritePlayMenu(anchor: View?, series: BaseItemDto) {
+		if (anchor == null) return
+		popupMenu(requireContext(), anchor) {
+			item(getString(R.string.lbl_play_something)) { playRandomEpisode(series) }
+			item(getString(R.string.lbl_open_show)) { navigationRepository.navigate(Destinations.itemDetails(series.id)) }
+		}.showIfNotEmpty()
+	}
+
+	/** Play a random episode of [series] immediately. */
+	private fun playRandomEpisode(series: BaseItemDto) {
+		lifecycleScope.launch {
+			val episode = withContext(Dispatchers.IO) {
+				val response by api.tvShowsApi.getEpisodes(
+					seriesId = series.id,
+					isMissing = false,
+					sortBy = ItemSortBy.RANDOM,
+					limit = 1,
+					fields = ItemRepository.itemFields,
+				)
+				response.items.firstOrNull()
+			}
+
+			if (episode == null) {
+				Toast.makeText(requireContext(), getString(R.string.msg_no_playable_items), Toast.LENGTH_SHORT).show()
+				return@launch
+			}
+
+			playbackLauncher.launch(requireContext(), listOf(episode))
+		}
+	}
+
+	/** Pick a random favourite series and play a random episode of it. */
+	private fun playRandomFavorite() {
+		lifecycleScope.launch {
+			val series = withContext(Dispatchers.IO) {
+				val response by api.itemsApi.getItems(
+					isFavorite = true,
+					includeItemTypes = setOf(BaseItemKind.SERIES),
+					recursive = true,
+					sortBy = setOf(ItemSortBy.RANDOM),
+					limit = 1,
+					fields = ItemRepository.browseFields,
+				)
+				response.items.firstOrNull()
+			}
+
+			if (series == null) {
+				Toast.makeText(requireContext(), getString(R.string.msg_no_playable_items), Toast.LENGTH_SHORT).show()
+				return@launch
+			}
+
+			playRandomEpisode(series)
+		}
+	}
+
 	private inner class ItemViewClickedListener : OnItemViewClickedListener {
 		override fun onItemClicked(
 			itemViewHolder: Presenter.ViewHolder?,
@@ -250,15 +281,25 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		) {
 			if (item is GridButton) {
 				when (item.id) {
+					HomeFragmentFavoritesRow.SURPRISE_ME_OPTION_ID -> playRandomFavorite()
 					LiveTvOption.LIVE_TV_GUIDE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvGuide)
 					LiveTvOption.LIVE_TV_SCHEDULE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSchedule)
 					LiveTvOption.LIVE_TV_RECORDINGS_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvRecordings)
 					LiveTvOption.LIVE_TV_SERIES_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSeriesRecordings)
 				}
+				return
 			}
 
 			if (item !is BaseRowItem) return
 			if (row !is ListRow) return
+
+			// A favourite show: offer to play a random episode or open the show.
+			val baseItem = item.baseItem
+			if (baseItem?.type == BaseItemKind.SERIES) {
+				showFavoritePlayMenu(itemViewHolder?.view, baseItem)
+				return
+			}
+
 			@Suppress("UNCHECKED_CAST")
 			itemLauncher.launch(item, row.adapter as MutableObjectAdapter<Any>, requireContext())
 		}
