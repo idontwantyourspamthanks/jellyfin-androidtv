@@ -107,8 +107,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			// Actually add the sections
 			for (section in homesections) when (section) {
 				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
-				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
-				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
+				// The library ("My Media") rows are superseded by the navigation drawer's library list.
+				HomeSectionType.LIBRARY_TILES_SMALL -> Unit
+				HomeSectionType.LIBRARY_BUTTONS -> Unit
 				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
 				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
 				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
