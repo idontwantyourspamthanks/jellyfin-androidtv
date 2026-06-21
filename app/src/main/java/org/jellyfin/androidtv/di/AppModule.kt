@@ -25,6 +25,9 @@ import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.data.repository.ItemMutationRepositoryImpl
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepositoryImpl
+import org.jellyfin.androidtv.data.repository.ApiSeasonDataSource
+import org.jellyfin.androidtv.data.repository.SeasonRepository
+import org.jellyfin.androidtv.data.repository.SeasonRepositoryImpl
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepositoryImpl
 import org.jellyfin.androidtv.data.service.BackgroundService
@@ -148,6 +151,7 @@ val appModule = module {
 	single<CustomMessageRepository> { CustomMessageRepositoryImpl() }
 	single<NavigationRepository> { NavigationRepositoryImpl(Destinations.home) }
 	single<SearchRepository> { SearchRepositoryImpl(get()) }
+	single<SeasonRepository> { SeasonRepositoryImpl(ApiSeasonDataSource(get())) }
 	single<MediaSegmentRepository> { MediaSegmentRepositoryImpl(get(), get()) }
 	single<ExternalAppRepository> { ExternalAppRepository(get(), getAll(), get<DefaultExternalPlayerApi>()) }
 

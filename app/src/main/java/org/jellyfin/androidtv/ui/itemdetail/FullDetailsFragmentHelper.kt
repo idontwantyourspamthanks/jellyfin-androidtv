@@ -14,8 +14,8 @@ import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.constant.Extras
 import org.jellyfin.androidtv.data.repository.ItemRepository
+import org.jellyfin.androidtv.data.repository.SeasonRepository
 import org.jellyfin.androidtv.ui.SeasonSelectionPopup
-import org.jellyfin.androidtv.ui.browsing.BrowsingUtils
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destination
 import org.jellyfin.androidtv.ui.navigation.Destinations
@@ -177,27 +177,39 @@ private fun Destination.Fragment.representedItemId(): UUID? {
 
 fun FullDetailsFragment.showSeasonSelection(view: View) {
 	val seriesId = mBaseItem.seriesId ?: return
-	val api by inject<ApiClient>()
 	val navigationRepository by inject<NavigationRepository>()
+	val seasonRepository by inject<SeasonRepository>()
 
-	lifecycleScope.launch {
-		val seasons = try {
-			withContext(Dispatchers.IO) {
-				api.tvShowsApi.getSeasons(BrowsingUtils.createSeasonsRequest(seriesId)).content
-			}.items
-		} catch (error: ApiClientException) {
-			Timber.w(error, "Failed to load seasons for series $seriesId")
-			return@launch
+	val currentSeasonId = if (mBaseItem.type == BaseItemKind.SEASON) mBaseItem.id else mBaseItem.seasonId
+	val openPopup = { seasons: List<BaseItemDto> ->
+		if (seasons.isNotEmpty()) {
+			SeasonSelectionPopup(requireContext(), view) { season ->
+				navigationRepository.navigate(Destinations.itemDetails(season.id))
+			}.show(seasons, currentSeasonId)
 		}
-
-		if (seasons.isEmpty()) return@launch
-
-		val currentSeasonId = if (mBaseItem.type == BaseItemKind.SEASON) mBaseItem.id else mBaseItem.seasonId
-
-		SeasonSelectionPopup(requireContext(), view) { season ->
-			navigationRepository.navigate(Destinations.itemDetails(season.id))
-		}.show(seasons, currentSeasonId)
 	}
+
+	val cached = seasonRepository.getCachedSeasons(seriesId)
+	if (cached != null) {
+		openPopup(cached)
+	} else {
+		// Not prefetched yet (or prefetch still in flight) - fetch then open.
+		lifecycleScope.launch {
+			seasonRepository.fetchSeasons(seriesId)?.let(openPopup)
+		}
+	}
+}
+
+/**
+ * Warm the season cache in the background so the season popup opens instantly the first time it is
+ * summoned. Called when the seasons button is added to a detail page; a cache hit is a cheap no-op,
+ * so it is safe to call on every page load.
+ */
+fun FullDetailsFragment.prefetchSeasons() {
+	val seriesId = mBaseItem.seriesId ?: return
+	val seasonRepository by inject<SeasonRepository>()
+	if (seasonRepository.getCachedSeasons(seriesId) != null) return
+	lifecycleScope.launch { seasonRepository.fetchSeasons(seriesId) }
 }
 
 fun FullDetailsFragment.createFakeSeriesTimerBaseItemDto(timer: SeriesTimerInfoDto) = BaseItemDto(

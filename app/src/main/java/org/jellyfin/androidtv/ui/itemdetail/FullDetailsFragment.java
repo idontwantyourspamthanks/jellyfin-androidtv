@@ -1091,6 +1091,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
             });
             mDetailsOverviewRow.addAction(seasonsButton);
+            // Warm the season cache now so the popup opens instantly the first time it is summoned.
+            FullDetailsFragmentHelperKt.prefetchSeasons(this);
         }
 
         // Search this show's episodes - available at every level of the show hierarchy
