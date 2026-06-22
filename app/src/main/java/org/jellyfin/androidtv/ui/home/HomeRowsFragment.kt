@@ -49,6 +49,7 @@ import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
+import org.jellyfin.androidtv.ui.screentime.ScreenTimeRepository
 import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
@@ -77,6 +78,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val itemLauncher by inject<ItemLauncher>()
 	private val playbackLauncher by inject<PlaybackLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
+	private val screenTimeRepository by inject<ScreenTimeRepository>()
 
 	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository) }
 
@@ -88,6 +90,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
+	private val watchedToday by lazy { HomeFragmentWatchedTodayRow(lifecycleScope, api, screenTimeRepository) }
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -108,6 +111,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			val rows = mutableListOf<HomeFragmentRow>()
 			rows.add(helper.loadResumeVideo())
 			rows.add(HomeFragmentFavoritesRow(api, lifecycleScope))
+			rows.add(watchedToday)
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
@@ -180,6 +184,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		// Update audio queue
 		Timber.i("Updating audio queue in HomeFragment (onResume)")
 		nowPlaying.update(requireContext(), adapter as MutableObjectAdapter<Row>)
+
+		// Refresh the list of episodes watched today (a new one may have just played).
+		watchedToday.update(requireContext(), adapter as MutableObjectAdapter<Row>)
 	}
 
 	override fun onQueueStatusChanged(hasQueue: Boolean) {

@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.jellyfin.androidtv.preference.UserPreferences
 import java.util.Calendar
+import java.util.UUID
 
 /**
  * A snapshot of today's screen time tally and the active daily limits.
@@ -53,14 +54,28 @@ class ScreenTimeRepository(
 	fun isLimitReached(): Boolean = loadState().limitReached
 
 	/** Records a started episode against today's tally. [runTimeTicks] may be null. */
-	fun recordEpisode(runTimeTicks: Long?) {
+	fun recordEpisode(id: UUID, runTimeTicks: Long?) {
 		rolloverIfNewDay()
 		val minutes = ((runTimeTicks ?: 0L) / TICKS_PER_MINUTE).toInt()
 		userPreferences[UserPreferences.screenTimeEpisodesToday] =
 			userPreferences[UserPreferences.screenTimeEpisodesToday] + 1
 		userPreferences[UserPreferences.screenTimeMinutesToday] =
 			userPreferences[UserPreferences.screenTimeMinutesToday] + minutes
+		val watched = userPreferences[UserPreferences.screenTimeWatchedIds]
+		userPreferences[UserPreferences.screenTimeWatchedIds] =
+			if (watched.isBlank()) id.toString() else "$watched,$id"
 		refresh()
+	}
+
+	/** Distinct episodes started today, most recent first. */
+	fun watchedEpisodeIds(): List<UUID> {
+		rolloverIfNewDay()
+		return userPreferences[UserPreferences.screenTimeWatchedIds]
+			.split(',')
+			.filter { it.isNotBlank() }
+			.mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+			.asReversed()
+			.distinct()
 	}
 
 	/** Sets today's limits. They persist to future days until changed. 0 clears a limit. */
@@ -91,6 +106,7 @@ class ScreenTimeRepository(
 			userPreferences[UserPreferences.screenTimeCountDay] = today
 			userPreferences[UserPreferences.screenTimeEpisodesToday] = 0
 			userPreferences[UserPreferences.screenTimeMinutesToday] = 0
+			userPreferences[UserPreferences.screenTimeWatchedIds] = ""
 		}
 	}
 

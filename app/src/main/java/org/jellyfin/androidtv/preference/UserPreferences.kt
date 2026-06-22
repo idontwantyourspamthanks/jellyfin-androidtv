@@ -97,6 +97,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var screenTimeMinutesToday = intPreference("screentime_minutes_today", 0)
 
 		/**
+		 * Ids of episodes started today, in watch order, comma separated.
+		 */
+		var screenTimeWatchedIds = stringPreference("screentime_watched_ids", "")
+
+		/**
 		 * Duration in seconds to subtract from resume time
 		 */
 		var resumeSubtractDuration = stringPreference("pref_resume_preroll", "0")

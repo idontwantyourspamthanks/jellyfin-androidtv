@@ -247,6 +247,7 @@
     <string name="screen_time_done">Done</string>
     <string name="screen_time_today_summary">Watched today: %1$d episodes, %2$d min</string>
     <string name="screen_time_blocked">No more TV today</string>
+    <string name="lbl_watched_today">Watched today</string>
     <string name="lbl_series_recordings">Series recordings</string>
     <string name="lbl_at_any_time">At any time</string>
     <string name="lbl_on_schedule">On schedule</string>

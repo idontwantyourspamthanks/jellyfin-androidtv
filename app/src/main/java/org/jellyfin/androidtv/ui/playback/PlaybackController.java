@@ -706,7 +706,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     }
                     return null;
                 }
-                screenTime.recordEpisode(item.getRunTimeTicks());
+                screenTime.recordEpisode(item.getId(), item.getRunTimeTicks());
                 mLastScreenTimeItemId = item.getId();
             }
 
