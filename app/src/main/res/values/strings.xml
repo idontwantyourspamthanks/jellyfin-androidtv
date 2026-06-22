@@ -236,6 +236,17 @@
     <string name="lbl_series_settings">Series preferences</string>
     <string name="msg_settings_updated">Preferences updated</string>
     <string name="lbl_save">Save</string>
+    <!-- Screen time -->
+    <string name="screen_time_title">Screen time</string>
+    <string name="screen_time_set_limits">Set screen time limits</string>
+    <string name="screen_time_max_episodes">Episodes per day</string>
+    <string name="screen_time_max_minutes">Minutes per day</string>
+    <string name="screen_time_no_limit">No limit</string>
+    <string name="screen_time_minutes_value">%1$d min</string>
+    <string name="screen_time_adjust_hint">Press left and right to adjust. Zero means no limit.</string>
+    <string name="screen_time_done">Done</string>
+    <string name="screen_time_today_summary">Watched today: %1$d episodes, %2$d min</string>
+    <string name="screen_time_blocked">No more TV today</string>
     <string name="lbl_series_recordings">Series recordings</string>
     <string name="lbl_at_any_time">At any time</string>
     <string name="lbl_on_schedule">On schedule</string>

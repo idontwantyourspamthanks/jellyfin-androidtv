@@ -17,6 +17,19 @@
         android:contentDescription="@string/lbl_home"
         android:src="@drawable/ic_house" />
 
+    <TextView
+        android:id="@+id/screenTimeReadout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-light"
+        android:paddingStart="16dp"
+        android:shadowColor="@color/black"
+        android:shadowRadius="4"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        tools:ignore="RtlSymmetry"
+        tools:text="3 · 67m" />
+
     <TextClock
         android:id="@+id/clock"
         android:layout_width="wrap_content"

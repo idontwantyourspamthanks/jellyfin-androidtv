@@ -27,6 +27,7 @@ import org.jellyfin.androidtv.ui.InteractionTrackerViewModel;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
+import org.jellyfin.androidtv.ui.screentime.ScreenTimeRepository;
 import org.jellyfin.androidtv.util.apiclient.ReportingHelper;
 import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.profile.DeviceProfileKt;
@@ -50,6 +51,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 import kotlin.Lazy;
 import timber.log.Timber;
@@ -66,7 +69,12 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     private Lazy<ApiClient> api = inject(ApiClient.class);
     private Lazy<DataRefreshService> dataRefreshService = inject(DataRefreshService.class);
     private Lazy<ReportingHelper> reportingHelper = inject(ReportingHelper.class);
+    private Lazy<ScreenTimeRepository> screenTimeRepository = inject(ScreenTimeRepository.class);
     private final Lazy<InteractionTrackerViewModel> lazyInteractionTracker = inject(InteractionTrackerViewModel.class);
+
+    // Id of the episode last counted against today's screen time, so re-inits of the same episode
+    // (e.g. switching subtitle/audio track) don't count twice.
+    private UUID mLastScreenTimeItemId;
 
     List<BaseItemDto> mItems;
     VideoManager mVideoManager;
@@ -686,6 +694,22 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         PlaybackControllerHelperKt.applyMediaSegments(this, item, () -> {
+            // Enforce kids' screen time limits for episodes. Only act on a genuinely new episode so
+            // re-initialising the same one (subtitle/audio switch) neither blocks nor double-counts.
+            if (item.getType() == BaseItemKind.EPISODE && !Objects.equals(item.getId(), mLastScreenTimeItemId)) {
+                ScreenTimeRepository screenTime = screenTimeRepository.getValue();
+                if (screenTime.isLimitReached()) {
+                    Timber.i("Screen time limit reached - blocking episode playback");
+                    if (mFragment != null) {
+                        Utils.showToast(mFragment.getContext(), mFragment.getString(R.string.screen_time_blocked));
+                        mFragment.closePlayer();
+                    }
+                    return null;
+                }
+                screenTime.recordEpisode(item.getRunTimeTicks());
+                mLastScreenTimeItemId = item.getId();
+            }
+
             // Set video start delay
             long videoStartDelay = userPreferences.getValue().get(UserPreferences.Companion.getVideoStartDelay());
             if (videoStartDelay > 0) {

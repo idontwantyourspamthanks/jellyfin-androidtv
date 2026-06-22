@@ -70,6 +70,32 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var nextUpTimeout = intPreference("next_up_timeout", 1000 * 7)
 
+		/* Screen time (kids) */
+		/**
+		 * Maximum episodes allowed to start per day. 0 means no limit. Persists across days.
+		 */
+		var screenTimeMaxEpisodes = intPreference("screentime_max_episodes", 0)
+
+		/**
+		 * Maximum minutes of episode runtime allowed per day. 0 means no limit. Persists across days.
+		 */
+		var screenTimeMaxMinutes = intPreference("screentime_max_minutes", 0)
+
+		/**
+		 * Day the current tally belongs to, as year * 1000 + dayOfYear. Used to reset at local midnight.
+		 */
+		var screenTimeCountDay = intPreference("screentime_count_day", 0)
+
+		/**
+		 * Episodes started so far today.
+		 */
+		var screenTimeEpisodesToday = intPreference("screentime_episodes_today", 0)
+
+		/**
+		 * Total runtime in minutes of episodes started so far today.
+		 */
+		var screenTimeMinutesToday = intPreference("screentime_minutes_today", 0)
+
 		/**
 		 * Duration in seconds to subtract from resume time
 		 */
