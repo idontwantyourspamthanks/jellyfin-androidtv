@@ -1,12 +1,15 @@
 package org.jellyfin.androidtv.ui.presentation
 
 import android.view.ViewGroup
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
 import androidx.leanback.widget.RowPresenter
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.DetailRowView
 import org.jellyfin.androidtv.ui.itemdetail.MyDetailsOverviewRow
 import org.jellyfin.androidtv.util.InfoLayoutHelper
 import org.jellyfin.androidtv.util.MarkdownRenderer
+import org.jellyfin.androidtv.util.dp
 import org.jellyfin.sdk.model.api.BaseItemKind
 
 class MyDetailsOverviewRowPresenter(
@@ -56,7 +59,23 @@ class MyDetailsOverviewRowPresenter(
 		}
 
 		fun setSummary(summary: String?) {
+			val hasSummary = !summary.isNullOrBlank()
+			binding.fdSummaryText.isVisible = hasSummary
 			binding.fdSummaryText.text = summary?.let { markdownRenderer.toMarkdownSpanned(it) }
+
+			// With no description the summary box would leave a tall empty band, so pull the buttons
+			// up under the header. The poster bottom and the episode row below follow them up.
+			val params = binding.fdButtonRow.layoutParams as ConstraintLayout.LayoutParams
+			if (hasSummary) {
+				params.topToTop = ConstraintLayout.LayoutParams.UNSET
+				params.topToBottom = R.id.fdSummaryText
+				params.topMargin = 10.dp(view.context)
+			} else {
+				params.topToBottom = ConstraintLayout.LayoutParams.UNSET
+				params.topToTop = R.id.guide_top
+				params.topMargin = 24.dp(view.context)
+			}
+			binding.fdButtonRow.layoutParams = params
 		}
 
 		fun setInfoValue3(text: String?) {

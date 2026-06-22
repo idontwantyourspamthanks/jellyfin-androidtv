@@ -50,8 +50,6 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.util.KeyProcessor
-import org.jellyfin.androidtv.util.popupMenu
-import org.jellyfin.androidtv.util.showIfNotEmpty
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
@@ -217,14 +215,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.removeAudioEventListener(this)
 	}
 
-	private fun showFavoritePlayMenu(anchor: View?, series: BaseItemDto) {
-		if (anchor == null) return
-		popupMenu(requireContext(), anchor) {
-			item(getString(R.string.lbl_play_something)) { playRandomEpisode(series) }
-			item(getString(R.string.lbl_open_show)) { navigationRepository.navigate(Destinations.itemDetails(series.id)) }
-		}.showIfNotEmpty()
-	}
-
 	/** Play a random episode of [series] immediately. */
 	private fun playRandomEpisode(series: BaseItemDto) {
 		lifecycleScope.launch {
@@ -293,15 +283,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (item !is BaseRowItem) return
 			if (row !is ListRow) return
 
-			// A favourite show: offer to play a random episode or open the show.
-			val baseItem = item.baseItem
-			if (baseItem?.type == BaseItemKind.SERIES) {
-				showFavoritePlayMenu(itemViewHolder?.view, baseItem)
+			// The favourites row uses a plain leanback ArrayObjectAdapter, so it can't go through
+			// ItemLauncher (which needs our MutableObjectAdapter). Open the item's detail page.
+			val rowAdapter = row.adapter
+			if (rowAdapter !is MutableObjectAdapter<*>) {
+				item.baseItem?.let { navigationRepository.navigate(Destinations.itemDetails(it.id)) }
 				return
 			}
 
 			@Suppress("UNCHECKED_CAST")
-			itemLauncher.launch(item, row.adapter as MutableObjectAdapter<Any>, requireContext())
+			itemLauncher.launch(item, rowAdapter as MutableObjectAdapter<Any>, requireContext())
 		}
 	}
 

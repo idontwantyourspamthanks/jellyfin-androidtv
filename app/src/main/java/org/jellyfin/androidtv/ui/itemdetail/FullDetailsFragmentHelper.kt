@@ -35,6 +35,7 @@ import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
 import org.jellyfin.sdk.model.extensions.ticks
@@ -295,6 +296,35 @@ fun FullDetailsFragment.playTrailers() {
 				Toast.LENGTH_LONG
 			).show()
 		}
+	}
+}
+
+/** Play a random episode of this series immediately - the "Play something" button. */
+fun FullDetailsFragment.playRandomEpisode() {
+	val api by inject<ApiClient>()
+
+	lifecycleScope.launch {
+		val episode = try {
+			withContext(Dispatchers.IO) {
+				api.tvShowsApi.getEpisodes(
+					seriesId = mBaseItem.id,
+					isMissing = false,
+					sortBy = ItemSortBy.RANDOM,
+					limit = 1,
+					fields = ItemRepository.itemFields,
+				).content
+			}.items.firstOrNull()
+		} catch (err: ApiClientException) {
+			Timber.w(err, "Failed to get a random episode for ${mBaseItem.id}")
+			null
+		}
+
+		if (episode == null) {
+			Toast.makeText(requireContext(), getString(R.string.msg_no_playable_items), Toast.LENGTH_SHORT).show()
+			return@launch
+		}
+
+		play(episode, 0, false)
 	}
 }
 

@@ -26,7 +26,6 @@
     <string name="lbl_search">Search</string>
     <string name="lbl_surprise_me">Surprise me</string>
     <string name="lbl_play_something">Play something</string>
-    <string name="lbl_open_show">Open show</string>
     <string name="lbl_edit_libraries">Edit libraries</string>
     <string name="lbl_edit_libraries_caption">Reorder your libraries and choose which ones appear on the home screen and in the menu.</string>
     <string name="lbl_move_up">Move up</string>

@@ -876,6 +876,16 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             });
             mDetailsOverviewRow.addAction(playButton);
 
+            if (isSeries) {
+                TextUnderButton playSomethingButton = TextUnderButton.create(requireContext(), R.drawable.ic_mix, buttonSize, 2, getString(R.string.lbl_play_something), new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        FullDetailsFragmentHelperKt.playRandomEpisode(FullDetailsFragment.this);
+                    }
+                });
+                mDetailsOverviewRow.addAction(playSomethingButton);
+            }
+
             if (isSeries && !isStarted) {
                 FullDetailsFragmentHelperKt.getNextUpEpisode(this, nextUpEpisode -> {
                     handleResumeButtonAndFocus(nextUpEpisode);
