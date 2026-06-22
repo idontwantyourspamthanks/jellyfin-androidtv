@@ -5,6 +5,7 @@ import android.widget.FrameLayout
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,9 @@ import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
 class GridButtonPresenter @JvmOverloads constructor(
 	private val width: Int = 110,
 	private val imageHeight: Int = 110,
+	// When true the icon is centred and contained (for simple glyphs) instead of cropped to fill
+	// the tile (which suits full-bleed artwork). Lets a button match a poster card's shape.
+	private val centerIcon: Boolean = false,
 ) : Presenter() {
 	private class ComposeViewWrapper(composeView: ComposeView) : FrameLayout(composeView.context) {
 		init {
@@ -51,6 +55,7 @@ class GridButtonPresenter @JvmOverloads constructor(
 			Box(
 				modifier = Modifier
 					.width(width.dp)
+					.then(if (centerIcon) Modifier.size(width.dp, imageHeight.dp) else Modifier)
 					.clip(RoundedCornerShape(4.dp))
 					.background(colorResource(R.color.button_default_normal_background))
 			) {
@@ -58,8 +63,14 @@ class GridButtonPresenter @JvmOverloads constructor(
 					Image(
 						painter = painterResource(value.imageRes),
 						contentDescription = value.text,
-						contentScale = ContentScale.Crop,
-						modifier = Modifier.size(width.dp, imageHeight.dp)
+						contentScale = if (centerIcon) ContentScale.Fit else ContentScale.Crop,
+						modifier = if (centerIcon) {
+							Modifier
+								.fillMaxSize(0.4f)
+								.align(Alignment.Center)
+						} else {
+							Modifier.size(width.dp, imageHeight.dp)
+						}
 					)
 				}
 
@@ -69,9 +80,15 @@ class GridButtonPresenter @JvmOverloads constructor(
 						color = colorResource(R.color.button_default_normal_text),
 						fontSize = 12.sp
 					),
-					modifier = Modifier
-						.padding(15.dp, 10.dp)
-						.align(Alignment.BottomStart)
+					modifier = if (centerIcon) {
+						Modifier
+							.padding(8.dp)
+							.align(Alignment.BottomCenter)
+					} else {
+						Modifier
+							.padding(15.dp, 10.dp)
+							.align(Alignment.BottomStart)
+					}
 				)
 			}
 		}

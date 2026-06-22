@@ -35,11 +35,12 @@ class HomeFragmentFavoritesRow(
 ) : HomeFragmentRow {
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		val presenterSelector = ClassPresenterSelector().apply {
-			addClassPresenter(GridButton::class.java, GridButtonPresenter())
+			// Match the poster cards (staticHeight 150, 2:3) so the surprise tile is the same shape.
+			addClassPresenter(GridButton::class.java, GridButtonPresenter(width = 100, imageHeight = 150, centerIcon = true))
 			addClassPresenter(BaseRowItem::class.java, cardPresenter)
 		}
 		val adapter = ArrayObjectAdapter(presenterSelector)
-		adapter.add(GridButton(SURPRISE_ME_OPTION_ID, context.getString(R.string.lbl_surprise_me), R.drawable.ic_shuffle))
+		adapter.add(GridButton(SURPRISE_ME_OPTION_ID, context.getString(R.string.lbl_surprise_me), R.drawable.ic_question_mark))
 
 		val header = HeaderItem(rowsAdapter.size().toLong(), context.getString(R.string.lbl_favorites))
 		rowsAdapter.add(ListRow(header, adapter))

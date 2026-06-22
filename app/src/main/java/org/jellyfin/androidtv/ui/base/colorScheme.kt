@@ -33,7 +33,7 @@ fun colorScheme(): ColorScheme = ColorScheme(
 	listHeadline = Tokens.Color.colorGrey25,
 	listCaption = Tokens.Color.colorGrey200,
 	listButton = Color.Transparent,
-	listButtonFocused = Tokens.Color.colorBluegrey800,
+	listButtonFocused = Color(0xFF990099),
 	surface = Tokens.Color.colorBluegrey900,
 	scrim = Tokens.Color.colorBlack.copy(alpha = 0.67f),
 )
