@@ -114,7 +114,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
     TextUnderButton mResumeButton;
     private TextUnderButton mVersionsButton;
-    TextUnderButton mPrevButton;
     private TextUnderButton mRecordButton;
     private TextUnderButton mRecSeriesButton;
     private TextUnderButton mSeriesSettingsButton;
@@ -128,7 +127,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     protected UUID mChannelId;
     protected BaseRowItem mCurrentItem;
     private Instant mLastUpdated;
-    public UUID mPrevItemId;
 
     private RowsSupportFragment mRowsFragment;
     private MutableObjectAdapter<Row> mRowsAdapter;
@@ -811,10 +809,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         }
     }
 
-    void gotoSeries() {
-        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(mBaseItem.getSeriesId()));
-    }
-
     private void deleteItem() {
         Timber.i("Showing item delete confirmation");
         new AlertDialog.Builder(requireContext())
@@ -835,7 +829,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
     TextUnderButton favButton = null;
     TextUnderButton shuffleButton = null;
-    TextUnderButton goToSeriesButton = null;
     TextUnderButton seasonsButton = null;
     TextUnderButton searchEpisodesButton = null;
     TextUnderButton queueButton = null;
@@ -1068,31 +1061,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             mDetailsOverviewRow.addAction(favButton);
         }
 
-        if (mBaseItem.getType() == BaseItemKind.EPISODE && mBaseItem.getSeriesId() != null) {
-            //add the prev button first so it will be there in proper position - we'll show it later if needed
-            mPrevButton = TextUnderButton.create(requireContext(), R.drawable.ic_previous_episode, buttonSize, 3, getString(R.string.lbl_previous_episode), new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (mPrevItemId != null) {
-                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(mPrevItemId));
-                    }
-                }
-            });
-
-            mDetailsOverviewRow.addAction(mPrevButton);
-
-            //now go get our prev episode id
-            FullDetailsFragmentHelperKt.populatePreviousButton(FullDetailsFragment.this);
-
-            goToSeriesButton = TextUnderButton.create(requireContext(), R.drawable.ic_tv, buttonSize, 0, getString(R.string.lbl_goto_series), new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    gotoSeries();
-                }
-            });
-            mDetailsOverviewRow.addAction(goToSeriesButton);
-        }
-
         if (mBaseItem.getType() == BaseItemKind.EPISODE || mBaseItem.getType() == BaseItemKind.SEASON) {
             seasonsButton = TextUnderButton.create(requireContext(), R.drawable.ic_grid, buttonSize, 0, getString(R.string.lbl_seasons), new View.OnClickListener() {
                 @Override
@@ -1244,7 +1212,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         if (trailerButton != null) actionsList.add(trailerButton);
         if (shuffleButton != null) actionsList.add(shuffleButton);
         if (favButton != null) actionsList.add(favButton);
-        if (goToSeriesButton != null) actionsList.add(goToSeriesButton);
 
         // reverse the list so the less important actions are hidden first
         Collections.reverse(actionsList);
