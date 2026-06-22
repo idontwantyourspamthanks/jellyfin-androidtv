@@ -23,6 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +98,15 @@ private fun BoxScope.DrawerContent(
 			.background(JellyfinTheme.colorScheme.surface)
 			.verticalScroll(rememberScrollState())
 			.focusGroup()
+			// Right collapses the drawer, mirroring left-to-open from the content.
+			.onPreviewKeyEvent { event ->
+				if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight) {
+					onDismissRequest()
+					true
+				} else {
+					false
+				}
+			}
 			.padding(vertical = 24.dp),
 		verticalArrangement = Arrangement.spacedBy(2.dp),
 	) {

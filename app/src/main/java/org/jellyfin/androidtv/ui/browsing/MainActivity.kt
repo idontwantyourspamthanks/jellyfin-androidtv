@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.browsing
 
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.FocusFinder
 import android.view.KeyEvent
@@ -155,7 +156,14 @@ class MainActivity : FragmentActivity() {
 		if (navigationDrawerViewModel.open.value || navigationDrawerViewModel.suppressed.value) return false
 		val focused = currentFocus ?: return false
 		val root = window.decorView as? ViewGroup ?: return false
-		return FocusFinder.getInstance().findNextFocus(root, focused, View.FOCUS_LEFT) == null
+		val next = FocusFinder.getInstance().findNextFocus(root, focused, View.FOCUS_LEFT) ?: return true
+
+		// A directional search can return a full-width host that overlaps the current focus rather
+		// than a real neighbour to its left - e.g. the Compose layer holding the home toolbar. A
+		// genuine left neighbour sits entirely left of the current focus and doesn't overlap it.
+		val focusedRect = Rect().also(focused::getGlobalVisibleRect)
+		val nextRect = Rect().also(next::getGlobalVisibleRect)
+		return nextRect.right > focusedRect.left
 	}
 
 	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
