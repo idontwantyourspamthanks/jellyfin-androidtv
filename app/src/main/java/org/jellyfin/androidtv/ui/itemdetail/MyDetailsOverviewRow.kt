@@ -15,6 +15,11 @@ class MyDetailsOverviewRow @JvmOverloads constructor(
 	var infoItem3: InfoItem? = null,
 	var selectedMediaSourceIndex: Int = 0,
 ) : Row() {
+	// The favourite toggle lives as a heart by the title rather than in the button row.
+	var favoriteVisible: Boolean = false
+	var favorite: Boolean = false
+	var onFavoriteClick: Runnable? = null
+
 	private val _actions = mutableListOf<TextUnderButton>()
 	val actions get() = _actions.toList()
 	val visibleActions get() = _actions.count { it.isVisible }

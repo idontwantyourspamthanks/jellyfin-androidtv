@@ -79,28 +79,18 @@ fun FullDetailsFragment.deleteItem(
 
 fun FullDetailsFragment.showDetailsMenu(
 	view: View,
-	baseItemDto: BaseItemDto,
 ) = popupMenu(requireContext(), view) {
 	// for each button check if it exists (not-null) and is invisible (overflow prevention)
 	if (queueButton?.isVisible == false) {
 		item(getString(R.string.lbl_add_to_queue)) { addItemToQueue() }
 	}
 
-	if (shuffleButton?.isVisible == false) {
-		item(getString(R.string.lbl_shuffle_all)) { shufflePlay() }
-	}
-
 	if (trailerButton?.isVisible == false) {
 		item(getString(R.string.lbl_play_trailers)) { playTrailers() }
 	}
 
-	if (favButton?.isVisible == false) {
-		val favoriteStringRes = when (baseItemDto.userData?.isFavorite) {
-			true -> R.string.lbl_remove_favorite
-			else -> R.string.lbl_add_favorite
-		}
-
-		item(getString(favoriteStringRes)) { toggleFavorite() }
+	if (deleteButton?.isVisible == false) {
+		item(getString(R.string.lbl_delete)) { deleteItem() }
 	}
 }.showIfNotEmpty()
 
@@ -228,7 +218,7 @@ fun FullDetailsFragment.toggleFavorite() {
 			favorite = !(mBaseItem.userData?.isFavorite ?: false)
 		)
 		mBaseItem = mBaseItem.copyWithUserData(userData)
-		favButton.isActivated = userData.isFavorite
+		setFavoriteState(userData.isFavorite)
 		dataRefreshService.lastFavoriteUpdate = Instant.now()
 	}
 }

@@ -2,10 +2,12 @@ package org.jellyfin.androidtv.ui
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.View.OnFocusChangeListener
 import android.widget.FrameLayout
+import androidx.core.view.isVisible
 import org.jellyfin.androidtv.databinding.ViewRowDetailsBinding
 
 class DetailRowView @JvmOverloads constructor(
@@ -49,5 +51,23 @@ class DetailRowView @JvmOverloads constructor(
 	init {
 		binding.fdButtonRow.setOnHierarchyChangeListener(buttonsHierarchyChangeListener)
 		binding.mainImage.clipToOutline = true
+	}
+
+	/**
+	 * Bridge focus between the button row and the favourite heart by the title. The event passes
+	 * through here on its way to the focused button, so we can claim Up/Down before leanback treats
+	 * them as row navigation. Down from the buttons still falls through to the row below.
+	 */
+	override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+		val heart = binding.fdFavoriteButton
+		if (event.action == KeyEvent.ACTION_DOWN && heart.isVisible) {
+			when (event.keyCode) {
+				KeyEvent.KEYCODE_DPAD_UP ->
+					if (binding.fdButtonRow.hasFocus()) return heart.requestFocus()
+				KeyEvent.KEYCODE_DPAD_DOWN ->
+					if (heart.isFocused) return binding.fdButtonRow.requestFocus()
+			}
+		}
+		return super.dispatchKeyEvent(event)
 	}
 }

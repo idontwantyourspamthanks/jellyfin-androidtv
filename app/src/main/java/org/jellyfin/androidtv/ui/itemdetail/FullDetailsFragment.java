@@ -758,6 +758,12 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         mDorPresenter.getViewHolder().setTitle(title);
     }
 
+    public void setFavoriteState(boolean favorite) {
+        if (mDetailsOverviewRow != null) mDetailsOverviewRow.setFavorite(favorite);
+        MyDetailsOverviewRowPresenter.ViewHolder viewholder = mDorPresenter.getViewHolder();
+        if (viewholder != null) viewholder.setFavoriteActivated(favorite);
+    }
+
     private String getRunTime() {
         Long runtime = Utils.getSafeValue(mBaseItem.getRunTimeTicks(), mBaseItem.getRunTimeTicks());
 
@@ -809,7 +815,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         }
     }
 
-    private void deleteItem() {
+    void deleteItem() {
         Timber.i("Showing item delete confirmation");
         new AlertDialog.Builder(requireContext())
                 .setTitle(getString(R.string.item_delete_confirm_title))
@@ -827,7 +833,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 .show();
     }
 
-    TextUnderButton favButton = null;
     TextUnderButton shuffleButton = null;
     TextUnderButton seasonsButton = null;
     TextUnderButton searchEpisodesButton = null;
@@ -939,7 +944,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             mDetailsOverviewRow.addAction(mVersionsButton);
         }
 
-        if (TrailerUtils.hasPlayableTrailers(requireContext(), mBaseItem)) {
+        // Trailers are clutter on a show page, where Back and the episode list matter more.
+        if (mBaseItem.getType() != BaseItemKind.SERIES && TrailerUtils.hasPlayableTrailers(requireContext(), mBaseItem)) {
             trailerButton = TextUnderButton.create(requireContext(), R.drawable.ic_trailer, buttonSize, 0, getString(R.string.lbl_play_trailers), new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1050,15 +1056,12 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 mDetailsOverviewRow.addAction(mWatchedToggleButton);
             }
 
-            //Favorite
-            favButton = TextUnderButton.create(requireContext(), R.drawable.ic_heart, buttonSize, 2, getString(R.string.lbl_favorite), new View.OnClickListener() {
-                @Override
-                public void onClick(final View v) {
-                    FullDetailsFragmentHelperKt.toggleFavorite(FullDetailsFragment.this);
-                }
-            });
-            favButton.setActivated(userData.isFavorite());
-            mDetailsOverviewRow.addAction(favButton);
+            // Favourite lives as a heart by the title (see MyDetailsOverviewRowPresenter), not in the row.
+            mDetailsOverviewRow.setFavoriteVisible(true);
+            mDetailsOverviewRow.setFavorite(userData.isFavorite());
+            mDetailsOverviewRow.setOnFavoriteClick(() -> FullDetailsFragmentHelperKt.toggleFavorite(FullDetailsFragment.this));
+        } else {
+            mDetailsOverviewRow.setFavoriteVisible(false);
         }
 
         if (mBaseItem.getType() == BaseItemKind.EPISODE || mBaseItem.getType() == BaseItemKind.SEASON) {
@@ -1145,7 +1148,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         moreButton = TextUnderButton.create(requireContext(), R.drawable.ic_more, buttonSize, 0, getString(R.string.lbl_other_options), new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                FullDetailsFragmentHelperKt.showDetailsMenu(FullDetailsFragment.this, v, mBaseItem);
+                FullDetailsFragmentHelperKt.showDetailsMenu(FullDetailsFragment.this, v);
             }
         });
 
@@ -1207,18 +1210,18 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         int visibleOptions = mDetailsOverviewRow.getVisibleActions();
 
         List<TextUnderButton> actionsList = new ArrayList<>();
-        // added in order of priority (should match res/menu/menu_details_more.xml)
+        // added in order of priority - the last added is the first to collapse into "More".
+        // Delete is the lowest priority (destructive, rarely used); Shuffle stays on the row.
         if (queueButton != null) actionsList.add(queueButton);
         if (trailerButton != null) actionsList.add(trailerButton);
-        if (shuffleButton != null) actionsList.add(shuffleButton);
-        if (favButton != null) actionsList.add(favButton);
+        if (deleteButton != null) actionsList.add(deleteButton);
 
         // reverse the list so the less important actions are hidden first
         Collections.reverse(actionsList);
 
         collapsedOptions = 0;
         for (TextUnderButton action : actionsList) {
-            if (visibleOptions - (ViewKt.isVisible(action) ? 1 : 0) + (!ViewKt.isVisible(moreButton) && collapsedOptions > 0 ? 1 : 0) < 5) {
+            if (visibleOptions - (ViewKt.isVisible(action) ? 1 : 0) + (!ViewKt.isVisible(moreButton) && collapsedOptions > 0 ? 1 : 0) < 6) {
                 if (!ViewKt.isVisible(action)) {
                     action.setVisibility(View.VISIBLE);
                     visibleOptions++;
@@ -1294,10 +1297,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             FullDetailsFragmentHelperKt.togglePlayed(FullDetailsFragment.this);
         }
     };
-
-    void shufflePlay() {
-        play(mBaseItem, 0, true);
-    }
 
     void play(final BaseItemDto item, final int pos, final boolean shuffle) {
         playbackHelper.getValue().getItemsToPlay(getContext(), item, pos == 0 && item.getType() == BaseItemKind.MOVIE, shuffle, new Response<List<BaseItemDto>>(getLifecycle()) {

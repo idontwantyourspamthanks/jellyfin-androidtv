@@ -38,6 +38,10 @@ class MyDetailsOverviewRowPresenter(
 
 			binding.mainImage.load(row.imageDrawable, null, null, 1.0, 0)
 
+			binding.fdFavoriteButton.isVisible = row.favoriteVisible
+			binding.fdFavoriteButton.isActivated = row.favorite
+			binding.fdFavoriteButton.setOnClickListener { row.onFavoriteClick?.run() }
+
 			setSummary(row.summary)
 
 			if (row.item.type == BaseItemKind.PERSON) {
@@ -80,6 +84,10 @@ class MyDetailsOverviewRowPresenter(
 
 		fun setInfoValue3(text: String?) {
 			binding.infoValue3.text = text
+		}
+
+		fun setFavoriteActivated(favorite: Boolean) {
+			binding.fdFavoriteButton.isActivated = favorite
 		}
 	}
 
